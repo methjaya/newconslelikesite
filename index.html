@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sahansa Jayawardhana | Portfolio OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #terminal-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #30363d #0d1117;
+        }
+
+        #terminal-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal-container::-webkit-scrollbar-track {
+            background: #0d1117;
+        }
+
+        #terminal-container::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+
+        .prompt {
+            color: #7ee787;
+            font-weight: bold;
+        }
+
+        .path {
+            color: #79c0ff;
+        }
+
+        .input-area {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        #command-input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            flex: 1;
+            margin-left: 8px;
+        }
+
+        .output-line {
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .command-entered {
+            color: #d2a8ff;
+        }
+
+        .dir-item {
+            color: #79c0ff;
+            font-weight: bold;
+        }
+
+        .file-item {
+            color: #c9d1d9;
+        }
+
+        .header {
+            background: #161b22;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #30363d;
+            font-size: 0.8rem;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .ascii-art {
+            color: #79c0ff;
+            font-size: 0.6rem;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 640px) {
+            .ascii-art { font-size: 0.4rem; }
+            #terminal-container { padding: 10px; }
+            body { font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="window-controls">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-yellow"></div>
+            <div class="dot dot-green"></div>
+        </div>
+        <div>sahansajayawardhana — -bash — 80x24</div>
+        <div id="clock"></div>
+    </div>
+
+    <div id="terminal-container" onclick="focusInput()">
+        <div class="ascii-art">
+  </div>
+        <div class="output-line">Welcome to SahansaOS v3.0.0-LTS</div>
+        <div class="output-line">Type <span class="text-yellow-400">'help'</span> to explore the resume.</div>
+        
+        <div id="output"></div>
+
+        <div class="input-area">
+            <span class="prompt">user@sahansajayawardhana</span><span class="mx-1">:</span><span class="path" id="current-path">~</span><span class="ml-1">$</span>
+            <input type="text" id="command-input" autofocus spellcheck="false" autocomplete="off">
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        const input = document.getElementById('command-input');
+        const currentPathDisplay = document.getElementById('current-path');
+        const clockDisplay = document.getElementById('clock');
+        
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        const fileSystem = {
+            'bio.txt': 'Sahansa Jayawardhana is currently pursuing an MBA at the University of Peradeniya, building on a strong academic background in software engineering, psychology, and management. A result-driven IT Project Manager with 3.5+ years of experience leading cross-functional teams to deliver high-impact software solutions.',
+            'academic.md': 'Academic Qualifications:\n• MBA (Reading) – University of Peradeniya\n• BSc (Hons) in Software Engineering\n• Diploma in Psychology and Counselling – MERIT Pass (GPA 3.95)\n• Diploma in Business and Human Resource Management\n• Diploma in Software Engineering\n• Diploma in Information Communication\n• Diploma in Computer Science\n• Certificate in Program Presenting',
+            'leadership.txt': 'Extracurricular & Leadership:\n• Former Deputy Head Prefect\n• Former Minister of Building & Developing Inter-School Relations, Student Parliament\n• Silver Medalist – All-Island Men & Women Youth Boxing Tournament 2019',
+            'contact.info': 'Email: sahansa252@gmail.com\nLinkedIn: linkedin.com/in/sahansajay\nGitHub: github.com/methjaya\nPhone: +94701581056'
+        };
+
+        const commands = {
+            help: () => `
+Available commands:
+
+Navigation & Info:
+- ls            List directory contents
+- pwd           Show current directory
+- tree          Show directory tree
+- whoami        Show identity summary
+- date          Show current date
+
+File operations:
+- cat [file]    Display file contents
+- file [path]   Show file type
+
+Resume commands:
+- about         Detailed background & Academic info
+- contact       Display contact information
+- skills        List technical skills & progress
+- experience    Show work experience history
+
+Utilities:
+- clear         Clear the terminal
+- echo [text]   Display text
+- help          Show this help message
+`,
+            whoami: () => "Name: Sahansa Jayawardhana\nRole: IT Project Manager\nLocation: Gampaha, Sri Lanka / Remote\nSpecialization: Agile Transformation & Digital Strategy",
+            
+            date: () => new Date().toString(),
+            
+            ls: () => Object.keys(fileSystem).map(item => `<span class="file-item">${item}</span>`).join('    '),
+
+            pwd: () => `/home/sahansajayawardhana`,
+
+            cat: (args) => {
+                const fileName = args[0];
+                if (!fileName) return "usage: cat [file]";
+                if (fileSystem[fileName]) return fileSystem[fileName];
+                return `cat: ${fileName}: No such file or directory`;
+            },
+
+            tree: () => `
+.
+├── academic.md
+├── bio.txt
+├── contact.info
+├── leadership.txt
+└── skills.doc
+`,
+
+            file: (args) => {
+                const path = args[0];
+                if (!path) return "usage: file [path]";
+                if (path.endsWith('.txt') || path.endsWith('.info')) return `${path}: ASCII text`;
+                if (path.endsWith('.md')) return `${path}: Markdown document`;
+                return `${path}: data`;
+            },
+
+            echo: (args) => args.join(' '),
+
+            clear: () => {
+                output.innerHTML = '';
+                return null;
+            },
+
+            about: () => `
+ABOUT SAHANSA JAYAWARDHANA
+--------------------------
+Currently pursuing an MBA at the University of Peradeniya. 
+Brings a unique blend of technical expertise, leadership experience, and a people-first mindset.
+
+ACADEMIC QUALIFICATIONS:
+${fileSystem['academic.md'].split('\n').slice(1).join('\n')}
+
+LEADERSHIP & EXTRACURRICULAR:
+${fileSystem['leadership.txt'].split('\n').slice(1).join('\n')}
+`,
+
+            contact: () => `
+📧 Email:    sahansa252@gmail.com
+🔗 LinkedIn: linkedin.com/in/sahansajay
+🐙 GitHub:   github.com/methjaya
+📱 Phone:    +94701581056
+`,
+
+            skills: () => `
+STAKEHOLDER MANAGEMENT  [####################] 100%
+RISK MANAGEMENT         [###################-] 95%
+JIRA / CONFLUENCE       [###################-] 95%
+AGILE / SCRUM           [##################--] 90%
+SDLC KNOWLEDGE          [##################--] 90%
+BUDGETING & FORECASTING [##################--] 90%
+
+Tools: JIRA, Confluence, MS Project, Trello, SQL, Python.
+Methodologies: Agile, Scrum, Kanban, Waterfall, Lean.
+Soft Skills: Strategic Planning, Risk Mitigation, Team Leadership.
+`,
+
+            experience: () => `
+LUNWICK LTD (3 Years 6 Months)
+------------------------------
+Project Manager
+📅 Feb 2023 – Present
+- Managed overseas projects, ensuring timely delivery and alignment with client expectations.
+- Coordinated cross-functional teams and maintained high stakeholder satisfaction.
+
+Project Management Trainee
+📅 Aug 2022 – Feb 2023
+- Structured training focused on ERP systems (Hotel/Restaurant Mgmt & HRIS).
+
+TALENTFORT PVT LTD (Contract)
+------------------------------
+Project Manager
+📅 Jun 2024 – Dec 2024
+📍 Colombo, Sri Lanka
+- Led software project management initiatives.
+- Utilized Jira and multiple project tools to deliver enterprise solutions.
+- Focused on execution, quality, and rigorous timelines.
+`
+        };
+
+        function focusInput() {
+            input.focus();
+        }
+
+        function updateClock() {
+            const now = new Date();
+            clockDisplay.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const rawInput = input.value.trim();
+                const [cmd, ...args] = rawInput.split(' ');
+                
+                if (rawInput !== '') {
+                    commandHistory.push(rawInput);
+                    historyIndex = commandHistory.length;
+                    
+                    const cmdEcho = document.createElement('div');
+                    cmdEcho.innerHTML = `<span class="prompt">user@sahansajayawardhana</span><span class="mx-1">:</span><span class="path">~</span><span class="ml-1">$</span> <span class="command-entered">${rawInput}</span>`;
+                    output.appendChild(cmdEcho);
+                    
+                    if (commands[cmd]) {
+                        const result = commands[cmd](args);
+                        if (result !== null) {
+                            const resultDiv = document.createElement('div');
+                            resultDiv.className = 'output-line';
+                            resultDiv.innerHTML = result.replace(/\n/g, '<br>');
+                            output.appendChild(resultDiv);
+                        }
+                    } else {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'output-line text-red-400';
+                        errorDiv.innerText = `sh: command not found: ${cmd}`;
+                        output.appendChild(errorDiv);
+                    }
+                }
+                
+                input.value = '';
+                const container = document.getElementById('terminal-container');
+                container.scrollTop = container.scrollHeight;
+            } else if (e.key === 'ArrowUp') {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    input.value = commandHistory[historyIndex];
+                }
+                e.preventDefault();
+            } else if (e.key === 'ArrowDown') {
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    input.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    input.value = '';
+                }
+                e.preventDefault();
+            }
+        });
+
+        window.onload = () => {
+            input.focus();
+        }
+    </script>
+</body>
+</html>
